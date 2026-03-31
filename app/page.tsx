@@ -1,65 +1,86 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const [topic, setTopic] = useState("");
+  const [notes, setNotes] = useState("");
+  const router = useRouter();
+
+  const handleStart = () => {
+    if (!topic && !notes) {
+      alert("Please enter a topic or paste some notes to begin.");
+      return;
+    }
+
+    // Save the user's input to the browser's local storage
+    if (notes) {
+      localStorage.setItem("typelearn-mode", "notes");
+      localStorage.setItem("typelearn-content", notes);
+    } else {
+      localStorage.setItem("typelearn-mode", "topic");
+      localStorage.setItem("typelearn-content", topic);
+    }
+
+    // Redirect to the typing lesson page
+    router.push("/learn");
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="min-h-screen bg-neutral-950 text-neutral-200 flex flex-col items-center justify-center p-6 font-sans">
+      <div className="max-w-xl w-full space-y-8">
+        
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-bold tracking-tight text-white">TypeLearn AI</h1>
+          <p className="text-neutral-400">Convert your study material into interactive typing exercises.</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 space-y-6 shadow-2xl">
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-300">Option 1: Enter a Subject/Topic</label>
+            <input
+              type="text"
+              placeholder="e.g., deadlock in os, binary search"
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+              value={topic}
+              onChange={(e) => {
+                setTopic(e.target.value);
+                setNotes(""); // Clear notes if they decide to type a topic instead
+              }}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-neutral-800"></div>
+            <span className="flex-shrink-0 mx-4 text-neutral-500 text-sm font-medium uppercase tracking-widest">OR</span>
+            <div className="flex-grow border-t border-neutral-800"></div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-neutral-300">Option 2: Paste Your Notes</label>
+            <textarea
+              rows={5}
+              placeholder="Paste your paragraphs, textbook text, or study notes here..."
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none transition-all"
+              value={notes}
+              onChange={(e) => {
+                setNotes(e.target.value);
+                setTopic(""); // Clear topic if they decide to paste notes instead
+              }}
+            />
+          </div>
+
+          <button
+            onClick={handleStart}
+            className="w-full bg-white text-black font-bold rounded-lg p-3 hover:bg-neutral-200 active:scale-[0.98] transition-all"
           >
-            Documentation
-          </a>
+            Start Learning Session
+          </button>
+
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   );
 }
