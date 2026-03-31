@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-// Initialize Groq
+const apiKey = process.env.GROQ_API_KEY || process.env.GROQ_API_KEY || "missing-key";
+
 const client = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY, 
+  apiKey: apiKey, 
   baseURL: "https://api.groq.com/openai/v1",
 });
 
@@ -18,25 +19,22 @@ export async function POST(req: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // YOUR FIX: Dynamic import to bypass Next.js Webpack issues with pdf-parse
-    const pdfParseModule: any = await import("pdf-parse");
-    const pdfParse = pdfParseModule.default ?? pdfParseModule;
-
-    const pdfData = await pdfParse(buffer);
+    // --- THE FIX: Use the server-safe PDF extractor ---
+    const pdfExtract = require("pdf-extraction");
+    
+    const pdfData = await pdfExtract(buffer);
     const rawText = pdfData.text?.trim();
 
     if (!rawText) {
       return NextResponse.json(
-        { error: "Could not read any text from this PDF." },
+        { error: "Could not extract any text from this PDF. It might be an image-only PDF." },
         { status: 400 }
       );
     }
 
     // --- DEEP AI INTEGRATION ---
-    // 1. Slice the text to 5000 characters so we don't blow up Groq's token limit
     const safeText = rawText.slice(0, 5000);
 
-    // 2. Ask Groq Llama-3 to distill the messy PDF into a typing lesson
     const completion = await client.chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [
@@ -58,11 +56,10 @@ export async function POST(req: Request) {
       throw new Error("Empty AI response");
     }
 
-    // Return the clean, AI-generated typing lesson
     return NextResponse.json({ text: lessonText });
 
-  } catch (error) {
-    console.error("PDF Parse/AI Error:", error);
+  } catch (error: any) {
+    console.error("PDF/AI Error:", error.message || error);
     return NextResponse.json({ error: "Server error processing PDF" }, { status: 500 });
   }
 }
