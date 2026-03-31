@@ -5,19 +5,13 @@ import { useRouter } from "next/navigation";
 import { chunkText } from "../../lib/chunkText";
 import { calculateAccuracy, calculateWPM } from "../../lib/calculateStats";
 
-// Hardcoded topics for MVP Version 0.1
-const HARDCODED_TOPICS: Record<string, string> = {
-  "transaction in dbms": "A transaction is a sequence of database operations treated as one logical unit. ACID properties are Atomicity, Consistency, Isolation, and Durability. COMMIT saves changes permanently. ROLLBACK undoes changes.",
-  "deadlock in os": "A deadlock is a situation where a set of processes are blocked because each process is holding a resource and waiting for another resource acquired by some other process. The four necessary conditions are Mutual Exclusion, Hold and Wait, No Preemption, and Circular Wait.",
-  "binary search": "Binary search is an efficient algorithm for finding an item from a sorted list of items. It works by repeatedly dividing in half the portion of the list that could contain the item, until you've narrowed down the possible locations to just one."
-};
-
 export default function LearnPage() {
   const router = useRouter();
   
   // Data State
   const [chunks, setChunks] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true); // New loading state for AI
   
   // Typing State
   const [typedText, setTypedText] = useState("");
@@ -30,27 +24,47 @@ export default function LearnPage() {
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 1. Load data on mount
+  // 1. Load data & Fetch AI on mount
   useEffect(() => {
-    const mode = localStorage.getItem("typelearn-mode");
-    const content = localStorage.getItem("typelearn-content");
+    const fetchContent = async () => {
+      const mode = localStorage.getItem("typelearn-mode");
+      const content = localStorage.getItem("typelearn-content");
 
-    if (!mode || !content) {
-      router.push("/");
-      return;
-    }
+      if (!mode || !content) {
+        router.push("/");
+        return;
+      }
 
-    let rawText = "";
-    if (mode === "notes") {
-      rawText = content;
-    } else if (mode === "topic") {
-      // Normalize to lowercase to match our hardcoded keys
-      const normalizedTopic = content.toLowerCase().trim();
-      rawText = HARDCODED_TOPICS[normalizedTopic] || `We don't have hardcoded data for "${content}" yet. Please try "transaction in dbms", "deadlock in os", or "binary search" for the MVP.`;
-    }
+      if (mode === "notes") {
+        setChunks(chunkText(content));
+        setIsLoading(false);
+      } else if (mode === "topic") {
+        try {
+          // Ask our backend to generate content
+          const response = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ topic: content }),
+          });
+          
+          const data = await response.json();
+          
+          if (data.text) {
+            setChunks(chunkText(data.text));
+          } else {
+            alert("Failed to generate content. Please try again.");
+            router.push("/");
+          }
+        } catch (error) {
+          console.error(error);
+          alert("Something went wrong with the AI.");
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
 
-    const processedChunks = chunkText(rawText);
-    setChunks(processedChunks);
+    fetchContent();
   }, [router]);
 
   // 2. Handle Typing Input
@@ -58,20 +72,12 @@ export default function LearnPage() {
     const value = e.target.value;
     const currentChunk = chunks[currentIndex];
 
-    // Start timer on first keystroke
-    if (!startTime && value.length > 0) {
-      setStartTime(Date.now());
-    }
-
-    // Prevent typing beyond the chunk length
+    if (!startTime && value.length > 0) setStartTime(Date.now());
     if (value.length > currentChunk.length) return;
 
     setTypedText(value);
 
-    // Calculate live stats
-    if (startTime) {
-      setWpm(calculateWPM(value, startTime, Date.now()));
-    }
+    if (startTime) setWpm(calculateWPM(value, startTime, Date.now()));
     setAccuracy(calculateAccuracy(currentChunk, value));
   };
 
@@ -89,14 +95,20 @@ export default function LearnPage() {
     }
   };
 
-  if (chunks.length === 0) return <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center">Loading...</div>;
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center space-y-4">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-neutral-400 font-mono animate-pulse">AI is writing your lesson...</p>
+      </main>
+    );
+  }
 
   if (isFinished) {
     return (
       <main className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-6">
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 text-center space-y-4 shadow-2xl">
           <h2 className="text-3xl font-bold text-green-400">Lesson Complete!</h2>
-          <p className="text-neutral-400">Great job typing through the material.</p>
           <button 
             onClick={() => router.push("/")}
             className="mt-4 bg-white text-black font-bold rounded-lg px-6 py-2 hover:bg-neutral-200 transition-all"
@@ -115,11 +127,9 @@ export default function LearnPage() {
     <main className="min-h-screen bg-neutral-950 text-neutral-200 flex flex-col items-center pt-24 p-6 font-sans">
       <div className="max-w-3xl w-full space-y-8">
         
-        {/* Top Bar: Stats & Progress */}
+        {/* Top Bar: Stats */}
         <div className="flex justify-between items-center bg-neutral-900 border border-neutral-800 p-4 rounded-lg shadow-sm">
-          <div className="text-sm font-medium text-neutral-400">
-            Chunk {currentIndex + 1} of {chunks.length}
-          </div>
+          <div className="text-sm font-medium text-neutral-400">Chunk {currentIndex + 1} of {chunks.length}</div>
           <div className="flex space-x-6">
             <div className="text-center">
               <span className="block text-2xl font-mono font-bold text-white">{wpm}</span>
@@ -132,22 +142,18 @@ export default function LearnPage() {
           </div>
         </div>
 
-        {/* The Text to Type */}
+        {/* Text to Type */}
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 shadow-2xl text-xl leading-relaxed font-medium">
           {currentChunk.split("").map((char, index) => {
-            let colorClass = "text-neutral-500"; // Untyped
+            let colorClass = "text-neutral-500"; 
             if (index < typedText.length) {
-              colorClass = typedText[index] === char ? "text-green-400" : "text-red-500 bg-red-500/10"; // Correct vs Incorrect
+              colorClass = typedText[index] === char ? "text-green-400" : "text-red-500 bg-red-500/10"; 
             }
-            return (
-              <span key={index} className={colorClass}>
-                {char}
-              </span>
-            );
+            return <span key={index} className={colorClass}>{char}</span>;
           })}
         </div>
 
-        {/* The Input Field */}
+        {/* Input Field */}
         <div className="space-y-4">
           <textarea
             ref={inputRef}
@@ -160,11 +166,10 @@ export default function LearnPage() {
             className="w-full bg-neutral-950 border-2 border-neutral-800 rounded-xl p-4 text-white text-lg focus:outline-none focus:border-blue-500/50 resize-none font-mono transition-all disabled:opacity-50"
             spellCheck={false}
           />
-
           {isChunkComplete && (
             <button
               onClick={handleNext}
-              className="w-full bg-blue-600 text-white font-bold rounded-lg p-4 hover:bg-blue-500 active:scale-[0.98] transition-all animate-fade-in"
+              className="w-full bg-blue-600 text-white font-bold rounded-lg p-4 hover:bg-blue-500 active:scale-[0.98] transition-all"
             >
               {currentIndex < chunks.length - 1 ? "Next Chunk →" : "Finish Lesson"}
             </button>
