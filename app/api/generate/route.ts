@@ -1,33 +1,50 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
-// Initialize the Gemini SDK with your secret key
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY as string);
+const client = new OpenAI({
+  apiKey: process.env.GEMINI_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
+});
 
 export async function POST(req: Request) {
+  let topic = "";
+
   try {
-    const { topic } = await req.json();
+    const body = await req.json();
+    topic = body.topic?.trim();
 
     if (!topic) {
       return NextResponse.json({ error: "Topic is required" }, { status: 400 });
     }
 
-    // We use the fast flash model for quick typing generation
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const completion = await client.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are an expert computer science tutor. Write short, clear, factual typing lessons.",
+        },
+        {
+          role: "user",
+          content: `Explain the topic "${topic}" in exactly 4 to 5 short, simple sentences. Do NOT use bullet points, markdown, or special formatting. Output only plain clean text.`,
+        },
+      ],
+      temperature: 0.7,
+    });
 
-    // The Prompt Engineering: We force the AI to write in typing-friendly chunks
-    const prompt = `You are an expert computer science tutor. 
-    Explain the topic "${topic}" in exactly 4 to 5 short, simple sentences. 
-    Make it factual and easy to understand. 
-    Do NOT use bullet points, bold text, markdown, or special formatting. Just output plain, clean text.`;
+    const text = completion.choices[0]?.message?.content?.trim();
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    if (!text) {
+      throw new Error("Empty AI response");
+    }
 
     return NextResponse.json({ text });
-
   } catch (error) {
     console.error("AI Generation Error:", error);
-    return NextResponse.json({ error: "Failed to generate content" }, { status: 500 });
+
+    const fallbackText = `${topic} is an important concept worth understanding clearly. It is used in real systems and helps build stronger technical thinking. Learning it step by step makes it easier to remember and apply. Practice and repetition improve both speed and understanding. This typing lesson was generated in fallback mode because the AI service is temporarily unavailable.`;
+
+    return NextResponse.json({ text: fallbackText });
   }
 }

@@ -11,7 +11,7 @@ export default function LearnPage() {
   // Data State
   const [chunks, setChunks] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true); // New loading state for AI
+  const [isLoading, setIsLoading] = useState(true);
   
   // Typing State
   const [typedText, setTypedText] = useState("");
@@ -21,10 +21,12 @@ export default function LearnPage() {
   const [wpm, setWpm] = useState(0);
   const [accuracy, setAccuracy] = useState(100);
   const [isFinished, setIsFinished] = useState(false);
+  
+  // NEW: Keep track of stats for every chunk
+  const [lessonStats, setLessonStats] = useState<{wpm: number, acc: number}[]>([]);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 1. Load data & Fetch AI on mount
   useEffect(() => {
     const fetchContent = async () => {
       const mode = localStorage.getItem("typelearn-mode");
@@ -40,7 +42,6 @@ export default function LearnPage() {
         setIsLoading(false);
       } else if (mode === "topic") {
         try {
-          // Ask our backend to generate content
           const response = await fetch("/api/generate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -67,7 +68,6 @@ export default function LearnPage() {
     fetchContent();
   }, [router]);
 
-  // 2. Handle Typing Input
   const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     const currentChunk = chunks[currentIndex];
@@ -81,8 +81,10 @@ export default function LearnPage() {
     setAccuracy(calculateAccuracy(currentChunk, value));
   };
 
-  // 3. Move to next chunk
   const handleNext = () => {
+    // NEW: Save the final stats for this specific chunk before moving on
+    setLessonStats((prev) => [...prev, { wpm, acc: accuracy }]);
+
     if (currentIndex < chunks.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setTypedText("");
@@ -104,14 +106,34 @@ export default function LearnPage() {
     );
   }
 
+  // NEW: The Final Scorecard Screen
   if (isFinished) {
+    // Calculate Averages
+    const avgWpm = Math.round(lessonStats.reduce((sum, stat) => sum + stat.wpm, 0) / lessonStats.length) || 0;
+    const avgAcc = Math.round(lessonStats.reduce((sum, stat) => sum + stat.acc, 0) / lessonStats.length) || 0;
+
     return (
-      <main className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-6">
-        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 text-center space-y-4 shadow-2xl">
-          <h2 className="text-3xl font-bold text-green-400">Lesson Complete!</h2>
+      <main className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-6 font-sans">
+        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-10 w-full max-w-md text-center space-y-8 shadow-2xl">
+          <div className="space-y-2">
+            <h2 className="text-3xl font-bold text-white">Lesson Complete</h2>
+            <p className="text-neutral-400">Here is how you performed.</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-neutral-950 border border-neutral-800 p-6 rounded-lg">
+              <span className="block text-4xl font-mono font-bold text-blue-400">{avgWpm}</span>
+              <span className="text-sm text-neutral-500 uppercase tracking-wider mt-1 block">Avg WPM</span>
+            </div>
+            <div className="bg-neutral-950 border border-neutral-800 p-6 rounded-lg">
+              <span className="block text-4xl font-mono font-bold text-green-400">{avgAcc}%</span>
+              <span className="text-sm text-neutral-500 uppercase tracking-wider mt-1 block">Avg ACC</span>
+            </div>
+          </div>
+
           <button 
             onClick={() => router.push("/")}
-            className="mt-4 bg-white text-black font-bold rounded-lg px-6 py-2 hover:bg-neutral-200 transition-all"
+            className="w-full bg-white text-black font-bold rounded-lg p-4 hover:bg-neutral-200 active:scale-[0.98] transition-all"
           >
             Learn a New Topic
           </button>
@@ -127,7 +149,6 @@ export default function LearnPage() {
     <main className="min-h-screen bg-neutral-950 text-neutral-200 flex flex-col items-center pt-24 p-6 font-sans">
       <div className="max-w-3xl w-full space-y-8">
         
-        {/* Top Bar: Stats */}
         <div className="flex justify-between items-center bg-neutral-900 border border-neutral-800 p-4 rounded-lg shadow-sm">
           <div className="text-sm font-medium text-neutral-400">Chunk {currentIndex + 1} of {chunks.length}</div>
           <div className="flex space-x-6">
@@ -142,7 +163,6 @@ export default function LearnPage() {
           </div>
         </div>
 
-        {/* Text to Type */}
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-8 shadow-2xl text-xl leading-relaxed font-medium">
           {currentChunk.split("").map((char, index) => {
             let colorClass = "text-neutral-500"; 
@@ -153,7 +173,6 @@ export default function LearnPage() {
           })}
         </div>
 
-        {/* Input Field */}
         <div className="space-y-4">
           <textarea
             ref={inputRef}
@@ -171,7 +190,7 @@ export default function LearnPage() {
               onClick={handleNext}
               className="w-full bg-blue-600 text-white font-bold rounded-lg p-4 hover:bg-blue-500 active:scale-[0.98] transition-all"
             >
-              {currentIndex < chunks.length - 1 ? "Next Chunk →" : "Finish Lesson"}
+              {currentIndex < chunks.length - 1 ? "Next Chunk →" : "View Results"}
             </button>
           )}
         </div>
