@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 const client = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey: process.env.GROQ_API_KEY,
   baseURL: "https://api.groq.com/openai/v1",
 });
 
