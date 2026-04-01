@@ -4,29 +4,26 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { chunkText } from "../../lib/chunkText";
 import { calculateAccuracy, calculateWPM } from "../../lib/calculateStats";
+import { recordSession } from "../../lib/userStats";
 
 export default function LearnPage() {
   const router = useRouter();
   
-  // Data State
+  // 1. ALL STATE HOOKS AT THE TOP
   const [chunks, setChunks] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Typing State
   const [typedText, setTypedText] = useState("");
   const [startTime, setStartTime] = useState<number | null>(null);
-  
-  // Stats State
+  const [isHardcore, setIsHardcore] = useState(false);
   const [wpm, setWpm] = useState(0);
   const [accuracy, setAccuracy] = useState(100);
   const [isFinished, setIsFinished] = useState(false);
-  
-  // NEW: Keep track of stats for every chunk
   const [lessonStats, setLessonStats] = useState<{wpm: number, acc: number}[]>([]);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // 2. FIRST USE EFFECT: Fetching Content
   useEffect(() => {
     const fetchContent = async () => {
       const mode = localStorage.getItem("typelearn-mode");
@@ -68,6 +65,16 @@ export default function LearnPage() {
     fetchContent();
   }, [router]);
 
+  // 3. SECOND USE EFFECT: Recording Stats safely at the top!
+  useEffect(() => {
+    if (isFinished && lessonStats.length > 0) {
+      const avgWpm = Math.round(lessonStats.reduce((sum, stat) => sum + stat.wpm, 0) / lessonStats.length) || 0;
+      const avgAcc = Math.round(lessonStats.reduce((sum, stat) => sum + stat.acc, 0) / lessonStats.length) || 0;
+      recordSession(avgWpm, avgAcc);
+    }
+  }, [isFinished, lessonStats]);
+
+  // 4. HELPER FUNCTIONS
   const handleTyping = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     const currentChunk = chunks[currentIndex];
@@ -82,7 +89,6 @@ export default function LearnPage() {
   };
 
   const handleNext = () => {
-    // NEW: Save the final stats for this specific chunk before moving on
     setLessonStats((prev) => [...prev, { wpm, acc: accuracy }]);
 
     if (currentIndex < chunks.length - 1) {
@@ -97,6 +103,7 @@ export default function LearnPage() {
     }
   };
 
+  // 5. EARLY RETURNS (Must happen AFTER all hooks)
   if (isLoading) {
     return (
       <main className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center space-y-4">
@@ -106,9 +113,7 @@ export default function LearnPage() {
     );
   }
 
-  // NEW: The Final Scorecard Screen
   if (isFinished) {
-    // Calculate Averages
     const avgWpm = Math.round(lessonStats.reduce((sum, stat) => sum + stat.wpm, 0) / lessonStats.length) || 0;
     const avgAcc = Math.round(lessonStats.reduce((sum, stat) => sum + stat.acc, 0) / lessonStats.length) || 0;
 
@@ -142,6 +147,7 @@ export default function LearnPage() {
     );
   }
 
+  // 6. MAIN RENDER
   const currentChunk = chunks[currentIndex];
   const isChunkComplete = typedText === currentChunk;
 
@@ -151,6 +157,13 @@ export default function LearnPage() {
         
         <div className="flex justify-between items-center bg-neutral-900 border border-neutral-800 p-4 rounded-lg shadow-sm">
           <div className="text-sm font-medium text-neutral-400">Chunk {currentIndex + 1} of {chunks.length}</div>
+          
+          {/* Hardcore Toggle */}
+          <div className="flex items-center space-x-2 bg-neutral-950 px-3 py-1.5 rounded-lg border border-neutral-800 cursor-pointer hover:border-red-500/50 transition-colors" onClick={() => setIsHardcore(!isHardcore)}>
+            <div className={`w-3 h-3 rounded-full ${isHardcore ? 'bg-red-500 animate-pulse' : 'bg-neutral-700'}`}></div>
+            <span className={`text-xs font-bold uppercase tracking-wider ${isHardcore ? 'text-red-500' : 'text-neutral-500'}`}>Hardcore</span>
+          </div>
+
           <div className="flex space-x-6">
             <div className="text-center">
               <span className="block text-2xl font-mono font-bold text-white">{wpm}</span>
@@ -167,7 +180,11 @@ export default function LearnPage() {
           {currentChunk.split("").map((char, index) => {
             let colorClass = "text-neutral-500"; 
             if (index < typedText.length) {
-              colorClass = typedText[index] === char ? "text-green-400" : "text-red-500 bg-red-500/10"; 
+              if (isHardcore && !isChunkComplete && typedText.length !== currentChunk.length) {
+                colorClass = "text-neutral-300"; 
+              } else {
+                colorClass = typedText[index] === char ? "text-green-400" : "text-red-500 bg-red-500/10"; 
+              }
             }
             return <span key={index} className={colorClass}>{char}</span>;
           })}
@@ -182,7 +199,7 @@ export default function LearnPage() {
             onChange={handleTyping}
             disabled={isChunkComplete}
             placeholder="Start typing the text above..."
-            className="w-full bg-neutral-950 border-2 border-neutral-800 rounded-xl p-4 text-white text-lg focus:outline-none focus:border-blue-500/50 resize-none font-mono transition-all disabled:opacity-50"
+            className={`w-full bg-neutral-950 border-2 border-neutral-800 rounded-xl p-4 text-lg focus:outline-none focus:border-blue-500/50 resize-none font-mono transition-all disabled:opacity-50 ${isHardcore && !isChunkComplete ? 'text-transparent caret-white selection:bg-transparent' : 'text-white'}`}
             spellCheck={false}
           />
           {isChunkComplete && (

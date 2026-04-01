@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+// NEW: Import useClerk
+import { SignInButton, UserButton, useAuth, useClerk } from "@clerk/nextjs";
 
 export default function Home() {
   const [tutorTopic, setTutorTopic] = useState("");
@@ -10,12 +12,21 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const router = useRouter();
-
+  
+  const { isLoaded, userId } = useAuth();
+  const { openSignIn } = useClerk(); // NEW: Hook to open the login modal
+  
   const handleStart = async () => {
-    // FIX: Added tutorTopic to the empty check
+    // 1. Check if they filled out a field
     if (!topic && !notes && !file && !tutorTopic) {
-      alert("Please enter a topic, paste notes, or upload a PDF to begin.");
+      alert("Please enter a topic, paste notes, upload a PDF, or enter a Mentor topic to begin.");
       return;
+    }
+
+    // 2. CRITICAL FIX: If they are not logged in, force the login modal and stop!
+    if (!userId) {
+      openSignIn();
+      return; 
     }
 
     // SCENARIO 0: Interactive Tutor Mode
@@ -24,7 +35,7 @@ export default function Home() {
       router.push("/tutor");
       return;
     }
-    
+
     // SCENARIO 1: Smart PDF Upload
     if (file) {
       setIsProcessing(true);
@@ -32,13 +43,13 @@ export default function Home() {
       formData.append("file", file);
 
       try {
-        const response = await fetch("/api/pdf", {
-          method: "POST",
-          body: formData,
-        });
-        
+        const response = await fetch("/api/pdf", { method: "POST", body: formData });
+        if (!response.ok) {
+          alert("Could not process PDF.");
+          setIsProcessing(false);
+          return;
+        }
         const data = await response.json();
-        
         if (data.text) {
           localStorage.setItem("typelearn-mode", "notes");
           localStorage.setItem("typelearn-content", data.text);
@@ -48,11 +59,10 @@ export default function Home() {
           setIsProcessing(false);
         }
       } catch (err) {
-        console.error(err);
         alert("Server error while reading PDF.");
         setIsProcessing(false);
       }
-      return; 
+      return;
     }
 
     // SCENARIO 2: Pasted Notes
@@ -61,8 +71,8 @@ export default function Home() {
       localStorage.setItem("typelearn-content", notes);
       router.push("/learn");
       return;
-    } 
-    
+    }
+
     // SCENARIO 3: AI Topic Generation
     if (topic) {
       localStorage.setItem("typelearn-mode", "topic");
@@ -72,18 +82,46 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-neutral-200 flex flex-col items-center justify-center p-6 font-sans">
-      <div className="max-w-xl w-full space-y-8">
-        
-        <div className="text-center space-y-2">
+    <main className="min-h-screen bg-neutral-950 text-neutral-200 flex flex-col items-center justify-center p-6 font-sans relative">
+      
+      {/* CLERK AUTH BUTTONS - Top Right */}
+      <div className="absolute top-6 right-6 z-50">
+        {!isLoaded ? null : userId ? (
+          <UserButton />
+        ) : (
+          <SignInButton mode="modal">
+            <button className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-lg font-bold transition-all shadow-lg">
+              Sign In
+            </button>
+          </SignInButton>
+        )}
+      </div>
+
+      <div className="max-w-xl w-full space-y-8 mt-12">
+        {/* HEADER SECTION */}
+        <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold tracking-tight text-white">TypeLearn AI</h1>
-          <p className="text-neutral-400">Convert your study material into interactive typing exercises.</p>
+          
+          <div className="flex justify-center">
+            <button
+              onClick={() => {
+                if (!userId) openSignIn();
+                else router.push("/dashboard");
+              }}
+              className="bg-neutral-800 hover:bg-neutral-700 text-white px-6 py-2 rounded-lg text-sm font-bold border border-neutral-700 shadow-md transition-all flex items-center space-x-2"
+            >
+              <span>📊 View My Dashboard</span>
+            </button>
+          </div>
+
+          <p className="text-neutral-400">
+            Convert your study material into interactive typing exercises or learn with an AI Mentor.
+          </p>
         </div>
 
-        {/* MAIN CONTENT CARD */}
+        {/* MAIN INTERACTION CARD */}
         <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 space-y-6 shadow-2xl relative overflow-hidden">
           
-          {/* Loading Overlay */}
           {isProcessing && (
             <div className="absolute inset-0 bg-neutral-900/90 backdrop-blur-sm flex flex-col items-center justify-center z-10 space-y-4">
               <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -91,7 +129,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* NEW FEATURE: AI MENTOR (Moved INSIDE the card) */}
+          {/* ✨ NEW FEATURE: AI MENTOR ✨ */}
           <div className="space-y-2 bg-blue-950/20 p-4 rounded-lg border border-blue-900/30">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-bold text-blue-400">
@@ -120,7 +158,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">Learn any Topic (Typing)</label>
+            <label className="text-sm font-medium text-neutral-300">Option 1: Learn any Topic</label>
             <input
               type="text"
               placeholder="e.g., deadlock in os, binary search"
@@ -142,7 +180,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">Upload a PDF Document</label>
+            <label className="text-sm font-medium text-neutral-300">Option 2: Upload a PDF Document</label>
             <input
               type="file"
               accept=".pdf"
@@ -164,7 +202,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium text-neutral-300">Paste Raw Notes</label>
+            <label className="text-sm font-medium text-neutral-300">Option 3: Paste Raw Notes</label>
             <textarea
               rows={3}
               placeholder="Paste text directly..."
@@ -186,7 +224,6 @@ export default function Home() {
           >
             Start Learning Session
           </button>
-
         </div>
       </div>
     </main>
