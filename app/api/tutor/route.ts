@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
+  apiKey: process.env.HUGGINGFACE_API_KEY, 
+  baseURL: "https://router.huggingface.co/v1",
 });
 
 export async function POST(req: Request) {
