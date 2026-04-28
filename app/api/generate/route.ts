@@ -2,8 +2,8 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 const client = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
+  apiKey: process.env.HUGGINGFACE_API_KEY,
+  baseURL: "https://router.huggingface.co/v1", // Hugging Face ka OpenAI-compatible URL
 });
 
 export async function POST(req: Request) {
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
     }
 
     const completion = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "meta-llama/Llama-3.3-70B-Instruct",
       messages: [
         {
           role: "system",
