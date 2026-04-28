@@ -2,49 +2,29 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 const client = new OpenAI({
-  apiKey: process.env.HUGGINGFACE_API_KEY, 
-baseURL: "https://router.huggingface.co/v1", // Hugging Face ka OpenAI-compatible URL
+  apiKey: process.env.HUGGINGFACE_API_KEY,
+  baseURL: "https://router.huggingface.co/v1",
 });
 
 export async function POST(req: Request) {
   let topic = "";
-
   try {
     const body = await req.json();
     topic = body.topic?.trim();
-
-    if (!topic) {
-      return NextResponse.json({ error: "Topic is required" }, { status: 400 });
-    }
+    if (!topic) return NextResponse.json({ error: "Topic required" }, { status: 400 });
 
     const completion = await client.chat.completions.create({
       model: "meta-llama/Llama-3.3-70B-Instruct",
       messages: [
-        {
-          role: "system",
-          content:
-            "You are an expert computer science tutor. Write short, clear, factual typing lessons.",
-        },
-        {
-          role: "user",
-          content: `Explain the topic "${topic}" in exactly 4 to 5 short, simple sentences. Do NOT use bullet points, markdown, or special formatting. Output only plain clean text.`,
-        },
+        { role: "system", content: "You are an expert tutor. Write short, clear, factual typing lessons." },
+        { role: "user", content: `Explain "${topic}" in 4-5 simple sentences. No markdown, no formatting.` },
       ],
       temperature: 0.7,
     });
 
     const text = completion.choices[0]?.message?.content?.trim();
-
-    if (!text) {
-      throw new Error("Empty AI response");
-    }
-
-    return NextResponse.json({ text });
+    return NextResponse.json({ text: text || "Fallback text here." });
   } catch (error) {
-    console.error("AI Generation Error:", error);
-
-    const fallbackText = `${topic} is an important concept worth understanding clearly. It is used in real systems and helps build stronger technical thinking. Learning it step by step makes it easier to remember and apply. Practice and repetition improve both speed and understanding. This typing lesson was generated in fallback mode because the AI service is temporarily unavailable.`;
-
-    return NextResponse.json({ text: fallbackText });
+    return NextResponse.json({ text: "Service temporarily unavailable." });
   }
 }
