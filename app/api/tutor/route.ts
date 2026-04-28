@@ -3,7 +3,7 @@ import OpenAI from "openai";
 
 const client = new OpenAI({
   apiKey: process.env.HUGGINGFACE_API_KEY, 
-  baseURL: "https://router.huggingface.co/v1",
+baseURL: "https://router.huggingface.co/v1",
 });
 
 export async function POST(req: Request) {

@@ -2,8 +2,8 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 const client = new OpenAI({
-  apiKey: process.env.HUGGINGFACE_API_KEY,
-  baseURL: "https://router.huggingface.co/v1", // Hugging Face ka OpenAI-compatible URL
+  apiKey: process.env.HUGGINGFACE_API_KEY, 
+baseURL: "https://router.huggingface.co/v1", // Hugging Face ka OpenAI-compatible URL
 });
 
 export async function POST(req: Request) {
