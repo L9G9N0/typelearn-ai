@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.HUGGINGFACE_API_KEY, 
+  apiKey: process.env.HUGGINGFACE_API_KEY || "dummy-key-for-build", // <-- Ye line add kar
   baseURL: "https://router.huggingface.co/v1",
 });
 

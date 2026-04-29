@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 
-const apiKey = process.env.GROQ_API_KEY || process.env.GROQ_API_KEY || "missing-key";
 const client = new OpenAI({
-  apiKey: process.env.HUGGINGFACE_API_KEY,
+  apiKey: process.env.HUGGINGFACE_API_KEY || "dummy-key-for-build", // <-- Ye line add kar
   baseURL: "https://router.huggingface.co/v1",
 });
+
+
 
 export async function POST(req: Request) {
   try {
